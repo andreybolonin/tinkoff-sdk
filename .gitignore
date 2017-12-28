@@ -1,0 +1,9 @@
+composer.lock
+phpunit.xml
+build/
+vendor/
+.idea/
+.DS_Store
+test.php
+teste2.php
+pem/
