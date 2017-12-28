@@ -34,7 +34,7 @@ trait HasSignature
      */
     private function getSerialNumber(): string
     {
-        $text = openssl_x509_parse('file://'.$this->getPemFile());
+        $text = openssl_x509_parse('file://'.$this->getPemFile(), true);
 
         return $text['serialNumber'];
     }
