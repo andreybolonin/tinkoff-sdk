@@ -8,6 +8,7 @@ use Personnage\Tinkoff\SDK\Exception\ResponseException;
 use Personnage\Tinkoff\SDK\HasSender;
 use Personnage\Tinkoff\SDK\Response\Init;
 use Personnage\Tinkoff\SDK\Response\Payment;
+use Personnage\Tinkoff\SDK\Response\State;
 use Personnage\Tinkoff\SDK\Sender;
 use Psr\Http\Message\RequestInterface;
 
@@ -85,6 +86,19 @@ final class Client
     }
 
     /**
+     * Get op state.
+     *
+     * @param mixed $paymentId
+     *
+     * @return State
+     * @throws HttpException
+     */
+    public function getState($paymentId): State
+    {
+        return new State($this->send($this->makeRequest('GetState', ['PaymentId' => $paymentId])));
+    }
+
+    /**
      * Init a new payment session and make payout to card.
      *
      * @param string $orderId Номер заказа в системе Продавца.
@@ -104,7 +118,7 @@ final class Client
         }
 
         $response = $this->payment($response->getPaymentId());
-        if ($response->hasError()) {
+        if ($response->hasError() || 'COMPLETED' !== $response->getStatus()) {
             throw new ResponseException($response);
         }
 
