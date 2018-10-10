@@ -7,20 +7,13 @@ use function Personnage\Tinkoff\SDK\interpolate;
 trait HasSignature
 {
     /**
-     * Get path to X509 file.
-     *
-     * @return string
-     */
-    abstract public function getPemFile(): string;
-
-    /**
      * Get message digest by GOST Р 34.11-94.
      *
      * @param array $values List arguments
      *
      * @return string
      */
-    private function digest(array $values): string
+    protected static function digest(array $values): string
     {
         ksort($values);
 
@@ -28,24 +21,13 @@ trait HasSignature
     }
 
     /**
-     * Get serial number of X509.
-     *
-     * @return string
-     */
-    private function getSerialNumber(): string
-    {
-        $text = openssl_x509_parse('file://'.$this->getPemFile(), true);
-
-        return $text['serialNumber'];
-    }
-
-    /**
      * Calculate signature from digest message.
      *
-     * @param  array|string $message
+     * @param  string|array  $message
+     * @param  string        $pemFile
      * @return string
      */
-    private function sign($message): string
+    protected static function sign($message, string $pemFile): string
     {
         $filename = function ($resource): string {
             return stream_get_meta_data($resource)['uri'];
@@ -56,7 +38,7 @@ trait HasSignature
              * Remove DigestValue field if it exists
              */
             unset($message['DigestValue']);
-            $message = $this->digest($message);
+            $message = static::digest($message);
         }
 
         fwrite($_ = tmpfile(), $message);
@@ -67,7 +49,7 @@ CMD;
         shell_exec(interpolate($smime, [
             'in' => $filename($_),
             'out' => $filename($__ = tmpfile()),
-            'signer' => $this->getPemFile(),
+            'signer' => $pemFile,
         ]));
 
         $output = shell_exec('openssl asn1parse -inform DER -in ' . $filename($__));

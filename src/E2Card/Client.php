@@ -2,6 +2,7 @@
 
 namespace Personnage\Tinkoff\SDK\E2Card;
 
+use Closure;
 use GuzzleHttp\Psr7\Request;
 use Personnage\Tinkoff\SDK\Exception\HttpException;
 use Personnage\Tinkoff\SDK\Exception\ResponseException;
@@ -18,7 +19,8 @@ final class Client
 
     private $baseUri;
     private $terminalKey;
-    private $pemFile;
+    private $certNumber;
+    private $signer;
 
     /**
      * @var array
@@ -31,25 +33,50 @@ final class Client
     /**
      * Init a new instance.
      *
-     * @param string $uri
-     * @param string $terminalKey
-     * @param string $pemFile
-     * @param Sender $sender
+     * @param string  $uri
+     * @param string  $terminalKey
+     * @param string  $certNumber
+     * @param Closure $signer
+     * @param Sender  $sender
      */
-    public function __construct(string $uri, string $terminalKey, string $pemFile, Sender $sender)
+    public function __construct(string $uri, string $terminalKey, string $certNumber, Closure $signer, Sender $sender)
     {
         $this->baseUri = rtrim($uri, '/');
         $this->terminalKey = $terminalKey;
-        $this->pemFile = realpath($pemFile);
+        $this->certNumber = $certNumber;
+        $this->signer = $signer;
         $this->setSender($sender);
     }
 
     /**
-     * {@inheritdoc}
+     * Create a new instance.
+     *
+     * @param string   $uri
+     * @param string   $terminalKey
+     * @param string   $pemFile
+     * @param Sender   $sender
+     * @return self
      */
-    public function getPemFile(): string
+    public static function make(string $uri, string $terminalKey, string $pemFile, Sender $sender): self
     {
-        return $this->pemFile;
+        $signer = function ($message) use ($pemFile): string {
+            return self::sign($message, realpath($pemFile));
+        };
+
+        return new self($uri, $terminalKey, self::getSerialNumber($pemFile), $signer, $sender);
+    }
+
+    /**
+     * Get serial number of X509.
+     *
+     * @param  string  $pemFile
+     * @return string
+     */
+    private static function getSerialNumber(string $pemFile): string
+    {
+        $text = openssl_x509_parse('file://'.$pemFile, true);
+
+        return $text['serialNumber'];
     }
 
     /**
@@ -136,10 +163,9 @@ final class Client
     private function makeRequest(string $uri, array $body = []): RequestInterface
     {
         $body['TerminalKey'] = $this->terminalKey;
-
-        $body['DigestValue'] = base64_encode($this->digest($body));
-        $body['SignatureValue'] = base64_encode($this->sign($body));
-        $body['X509SerialNumber'] = $this->getSerialNumber();
+        $body['DigestValue'] = base64_encode(self::digest($body));
+        $body['SignatureValue'] = base64_encode(\call_user_func($this->signer, $body));
+        $body['X509SerialNumber'] = $this->certNumber;
 
         return new Request('post', "$this->baseUri/$uri", self::$requestHeaders, http_build_query($body, '', '&'));
     }
