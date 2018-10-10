@@ -13,7 +13,7 @@ trait HasSignature
      *
      * @return string
      */
-    protected static function digest(array $values): string
+    public static function digest(array $values): string
     {
         ksort($values);
 
@@ -27,7 +27,7 @@ trait HasSignature
      * @param  string        $pemFile
      * @return string
      */
-    protected static function sign($message, string $pemFile): string
+    public static function sign($message, string $pemFile): string
     {
         $filename = function ($resource): string {
             return stream_get_meta_data($resource)['uri'];
