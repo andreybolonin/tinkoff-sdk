@@ -163,17 +163,12 @@ final class Client
      */
     private function makeRequest(string $uri, array $body = []): RequestInterface
     {
-        /**
-         * Удалить дайджест, чтобы не повлиять на подпись
-         */
-        unset($body['DigestValue']);
+        // Append terminal key
+        $body['TerminalKey'] = $this->terminalKey;
 
-        /** @var $data SecretDataContainer */
         $data = $this->getSecretData($body);
-
-        $body['TerminalKey']      = $this->terminalKey;
-        $body['DigestValue']      = base64_encode($data->getDigest());
-        $body['SignatureValue']   = base64_encode($data->getSignature());
+        $body['DigestValue'] = base64_encode($data->getDigest());
+        $body['SignatureValue'] = base64_encode($data->getSignature());
         $body['X509SerialNumber'] = $data->getSerial();
 
         return new Request('post', "$this->baseUri/$uri", self::$requestHeaders, http_build_query($body, '', '&'));
