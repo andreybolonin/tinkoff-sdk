@@ -20,7 +20,6 @@ final class Client
 
     private $baseUri;
     private $terminalKey;
-    private $certNumber;
     private $signer;
 
     /**
@@ -36,15 +35,13 @@ final class Client
      *
      * @param string  $uri
      * @param string  $terminalKey
-     * @param string  $certNumber
      * @param Closure $signer
      * @param Sender  $sender
      */
-    public function __construct(string $uri, string $terminalKey, string $certNumber, Closure $signer, Sender $sender)
+    public function __construct(string $uri, string $terminalKey, Closure $signer, Sender $sender)
     {
         $this->baseUri     = rtrim($uri, '/');
         $this->terminalKey = $terminalKey;
-        $this->certNumber  = $certNumber;
         $this->signer      = $signer;
         $this->setSender($sender);
     }
@@ -67,7 +64,7 @@ final class Client
             return new SecretDataContainer(self::getSerialNumber($cert), $digest, self::sign($digest, $cert));
         };
 
-        return new self($uri, $terminalKey, self::getSerialNumber($pemFile), $signer, $sender);
+        return new self($uri, $terminalKey, $signer, $sender);
     }
 
     /**
