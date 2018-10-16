@@ -10,6 +10,7 @@ use Personnage\Tinkoff\SDK\HasSender;
 use Personnage\Tinkoff\SDK\Response\Init;
 use Personnage\Tinkoff\SDK\Response\Payment;
 use Personnage\Tinkoff\SDK\Response\State;
+use Personnage\Tinkoff\SDK\SecretDataContainer;
 use Personnage\Tinkoff\SDK\Sender;
 use Psr\Http\Message\RequestInterface;
 
@@ -41,10 +42,10 @@ final class Client
      */
     public function __construct(string $uri, string $terminalKey, string $certNumber, Closure $signer, Sender $sender)
     {
-        $this->baseUri = rtrim($uri, '/');
+        $this->baseUri     = rtrim($uri, '/');
         $this->terminalKey = $terminalKey;
-        $this->certNumber = $certNumber;
-        $this->signer = $signer;
+        $this->certNumber  = $certNumber;
+        $this->signer      = $signer;
         $this->setSender($sender);
     }
 
@@ -59,8 +60,11 @@ final class Client
      */
     public static function make(string $uri, string $terminalKey, string $pemFile, Sender $sender): self
     {
-        $signer = function ($message) use ($pemFile): string {
-            return self::sign($message, realpath($pemFile));
+        $signer = function (string $raw) use ($pemFile): SecretDataContainer {
+            $cert = realpath($pemFile);
+            $digest = self::digest($raw);
+
+            return new SecretDataContainer(self::getSerialNumber($cert), $digest, self::sign($digest, $cert));
         };
 
         return new self($uri, $terminalKey, self::getSerialNumber($pemFile), $signer, $sender);
@@ -162,11 +166,30 @@ final class Client
      */
     private function makeRequest(string $uri, array $body = []): RequestInterface
     {
-        $body['TerminalKey'] = $this->terminalKey;
-        $body['DigestValue'] = base64_encode(self::digest($body));
-        $body['SignatureValue'] = base64_encode(\call_user_func($this->signer, $body));
-        $body['X509SerialNumber'] = $this->certNumber;
+        /**
+         * Удалить дайджест, чтобы не повлиять на подпись
+         */
+        unset($body['DigestValue']);
+
+        /** @var $data SecretDataContainer */
+        $data = $this->getSecretData($body);
+
+        $body['TerminalKey']      = $this->terminalKey;
+        $body['DigestValue']      = base64_encode($data->getDigest());
+        $body['SignatureValue']   = base64_encode($data->getSignature());
+        $body['X509SerialNumber'] = $data->getSerial();
 
         return new Request('post', "$this->baseUri/$uri", self::$requestHeaders, http_build_query($body, '', '&'));
+    }
+
+    /**
+     * Get digest and signature for request data.
+     *
+     * @param  array  $body
+     * @return SecretDataContainer
+     */
+    private function getSecretData(array $body): SecretDataContainer
+    {
+        return \call_user_func($this->signer, self::getValues($body));
     }
 }

@@ -7,41 +7,44 @@ use function Personnage\Tinkoff\SDK\interpolate;
 trait HasSignature
 {
     /**
+     * Transform array values to string.
+     *
+     * @param  array  $data
+     * @return string
+     */
+    public static function getValues(array $data): string
+    {
+        ksort($data);
+
+        return implode('', $data);
+    }
+
+    /**
      * Get message digest by GOST Р 34.11-94.
      *
-     * @param array $values List arguments
+     * @param string $values List arguments
      *
      * @return string
      */
-    public static function digest(array $values): string
+    public static function digest(string $values): string
     {
-        ksort($values);
-
-        return hash('gost-crypto', implode('', $values), true);
+        return hash('gost-crypto', $values, true);
     }
 
     /**
      * Calculate signature from digest message.
      *
-     * @param  string|array  $message
-     * @param  string        $pemFile
+     * @param  string  $digest
+     * @param  string  $pemFile
      * @return string
      */
-    public static function sign($message, string $pemFile): string
+    public static function sign(string $digest, string $pemFile): string
     {
         $filename = function ($resource): string {
             return stream_get_meta_data($resource)['uri'];
         };
 
-        if (\is_array($message)) {
-            /*
-             * Remove DigestValue field if it exists
-             */
-            unset($message['DigestValue']);
-            $message = static::digest($message);
-        }
-
-        fwrite($_ = tmpfile(), $message);
+        fwrite($_ = tmpfile(), $digest);
 
         static $smime = <<<'CMD'
 openssl smime -sign -signer %signer% -engine gost -gost89 -binary -noattr -nocerts -outform DER -in %in% -out %out%
